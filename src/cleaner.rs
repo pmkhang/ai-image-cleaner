@@ -94,11 +94,11 @@ fn inspect_png(bytes: &[u8], summary: &mut MetadataSummary) {
         let chunk_name = String::from_utf8_lossy(chunk_type).to_string();
 
         match chunk_type {
-            b"c2pa" | b"c2PA" => {
+            b"c2pa" | b"c2PA" | b"caBX" => {
                 summary.has_c2pa = true;
                 summary
                     .detected_tags
-                    .push("C2PA Content Credentials Manifest".into());
+                    .push(format!("C2PA Content Credentials ({chunk_name})"));
             }
             b"eXIf" => {
                 summary.has_exif = true;
