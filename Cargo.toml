@@ -1,0 +1,16 @@
+[package]
+name = "ai-image-cleaner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+image = "0.25.10"
+rayon = "1.12.0"
+thiserror = "2.0.21"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+crc32fast = "1.5.3"
+tempfile = "3.27.0"
