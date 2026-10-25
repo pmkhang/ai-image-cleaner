@@ -130,7 +130,7 @@ pub fn run_batch(cli: &Cli) -> Result<BatchStats, CleanerError> {
                 Err(e) => return Err((file.clone(), e)),
             };
 
-            match clean_image_file(file, &out_path, cli.deep, cli.strength, cli.dry_run) {
+            match clean_image_file(file, &out_path, cli.deep, cli.strength, cli.erase_logo, cli.dry_run) {
                 Ok(res) => {
                     success_count.fetch_add(1, Ordering::Relaxed);
                     if res.metadata_found.has_any() {

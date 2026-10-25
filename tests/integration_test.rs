@@ -78,7 +78,7 @@ fn test_png_ai_metadata_detection_and_stripping() {
     );
 
     // 2. Clean the file (Standard mode)
-    let result = clean_image_file(&input_path, &output_path, false, Strength::Medium, false)
+    let result = clean_image_file(&input_path, &output_path, false, Strength::Medium, false, false)
         .expect("Failed to clean file");
 
     assert_eq!(result.width, 32);
@@ -106,7 +106,7 @@ fn test_deep_cleaning_mode() {
     );
 
     // Clean with deep mode enabled
-    let result = clean_image_file(&input_path, &output_path, true, Strength::High, false)
+    let result = clean_image_file(&input_path, &output_path, true, Strength::High, false, false)
         .expect("Deep clean failed");
 
     assert!(result.deep_applied);
@@ -143,6 +143,7 @@ fn test_batch_processing_and_directory_hierarchy() {
         in_place: false,
         deep: true,
         strength: Strength::Medium,
+        erase_logo: false,
         recursive: true,
         threads: Some(2),
         dry_run: false,
@@ -169,7 +170,7 @@ fn test_dry_run_does_not_modify_or_create_files() {
 
     create_test_ai_png(&input_path, "DALL-E 3 generated prompt");
 
-    let res = clean_image_file(&input_path, &output_path, false, Strength::Medium, true)
+    let res = clean_image_file(&input_path, &output_path, false, Strength::Medium, false, true)
         .expect("Dry run failed");
 
     assert!(res.metadata_found.has_ai_prompt);

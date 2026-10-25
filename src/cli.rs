@@ -35,6 +35,10 @@ pub struct Cli {
     #[arg(short, long, default_value_t = false)]
     pub deep: bool,
 
+    /// Erase visible corner AI logos (e.g. Gemini 4-pointed sparkle in bottom-right corner)
+    #[arg(long, default_value_t = false)]
+    pub erase_logo: bool,
+
     /// Intensity of deep watermark disruption
     #[arg(long, value_enum, default_value_t = Strength::Medium)]
     pub strength: Strength,

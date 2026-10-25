@@ -225,12 +225,77 @@ fn inspect_webp(bytes: &[u8], summary: &mut MetadataSummary) {
     }
 }
 
-/// Cleans an image file by stripping all metadata and optionally perturbing pixels
+pub fn erase_corner_logo(img: &mut image::DynamicImage) {
+    let (w, h) = image::GenericImageView::dimensions(img);
+    if w < 200 || h < 200 {
+        return;
+    }
+
+    let mut rgba = img.to_rgba8();
+
+    // Standard Gemini watermark position: centered around (w - 112, h - 112)
+    let center_x = (w - 112) as f32;
+    let center_y = (h - 112) as f32;
+    let star_radius = 70.0f32;
+    let p = 0.50f32;
+
+    let min_x = (w - 200).max(0);
+    let max_x = w;
+    let min_y = (h - 200).max(0);
+    let max_y = h;
+
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let dx = (x as f32 - center_x).abs();
+            let dy = (y as f32 - center_y).abs();
+
+            if dx.powf(p) + dy.powf(p) <= (star_radius + 4.0).powf(p) {
+                let mut samples = Vec::new();
+                for r in (32..=52).step_by(2) {
+                    for deg in (0..360).step_by(10) {
+                        let rad = (deg as f32).to_radians();
+                        let sx = (x as f32 + rad.cos() * r as f32).round() as i32;
+                        let sy = (y as f32 + rad.sin() * r as f32).round() as i32;
+                        if sx >= 0 && sx < w as i32 && sy >= 0 && sy < h as i32 {
+                            let s_dx = (sx as f32 - center_x).abs();
+                            let s_dy = (sy as f32 - center_y).abs();
+                            if s_dx.powf(p) + s_dy.powf(p) > (star_radius + 6.0).powf(p) {
+                                samples.push(rgba.get_pixel(sx as u32, sy as u32));
+                            }
+                        }
+                    }
+                }
+
+                if !samples.is_empty() {
+                    let mut r_vals: Vec<u8> = samples.iter().map(|p| p[0]).collect();
+                    let mut g_vals: Vec<u8> = samples.iter().map(|p| p[1]).collect();
+                    let mut b_vals: Vec<u8> = samples.iter().map(|p| p[2]).collect();
+                    r_vals.sort_unstable();
+                    g_vals.sort_unstable();
+                    b_vals.sort_unstable();
+
+                    let dither: i16 = if (x ^ y) & 1 == 0 { 2 } else { -2 };
+                    let med_r = (r_vals[r_vals.len() / 2] as i16 + dither).clamp(0, 255) as u8;
+                    let med_g = (g_vals[g_vals.len() / 2] as i16 + dither).clamp(0, 255) as u8;
+                    let med_b = (b_vals[b_vals.len() / 2] as i16 + dither).clamp(0, 255) as u8;
+
+                    rgba.put_pixel(x, y, image::Rgba([med_r, med_g, med_b, 255]));
+                }
+            }
+        }
+    }
+
+    *img = image::DynamicImage::ImageRgba8(rgba);
+}
+
+/// Cleans an image file by stripping all metadata, optionally perturbing pixels,
+/// and optionally erasing visible corner AI watermarks (e.g. Gemini sparkle).
 pub fn clean_image_file(
     input_path: &Path,
     output_path: &Path,
     deep: bool,
     strength: Strength,
+    erase_logo: bool,
     dry_run: bool,
 ) -> Result<CleanResult, CleanerError> {
     let original_size = fs::metadata(input_path)
@@ -262,6 +327,11 @@ pub fn clean_image_file(
 
     let width = img.width();
     let height = img.height();
+
+    // If erase_logo is requested, erase visible corner watermarks (Gemini star)
+    if erase_logo {
+        erase_corner_logo(&mut img);
+    }
 
     // If deep mode is requested, apply subtle watermark disruption
     let mut deep_applied = false;
