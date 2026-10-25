@@ -1,154 +1,156 @@
 # 🛡️ AI Image Cleaner (`ai-image-cleaner`)
 
+**English** | [Tiếng Việt](README.vi.md)
+
 [![Rust](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C2PA](https://img.shields.io/badge/C2PA-Stripped-success.svg)](https://c2pa.org/)
 [![Rayon](https://img.shields.io/badge/multi--threaded-Rayon-red.svg)](https://github.com/rayon-rs/rayon)
 
-Một công cụ dòng lệnh (CLI) hiệu năng cao viết bằng **Rust**, được thiết kế để loại bỏ triệt để mọi dấu vết do AI tạo ra (bao gồm **C2PA Content Credentials**, **EXIF/XMP/IPTC**, **PNG generation prompt chunks**, **watermark ẩn SynthID**, và **logo ngôi sao Gemini** đóng dấu nổi) trên các định dạng ảnh phổ biến (**PNG, JPEG, WebP**).
+A high-performance command-line tool (CLI) written in **Rust** designed to sanitize AI-generated images by stripping **C2PA Content Credentials**, **EXIF/XMP/IPTC metadata**, **generation prompt chunks**, disrupting invisible **SynthID watermarks**, and erasing stamped **Gemini sparkle logos** across **PNG, JPEG, and WebP** formats.
 
-Giúp hình ảnh của bạn đăng tải lên các nền tảng mạng xã hội (**Facebook, Instagram, Threads, X/Twitter, TikTok, LinkedIn**) mà **không bị tự động nhận diện và gắn nhãn "AI-generated / Thông tin AI"**.
-
----
-
-## 📌 Mục lục
-
-- [Tại sao cần công cụ này?](#-tại-sao-cần-công-cụ-này)
-- [Tính năng nổi bật](#-tính-năng-nổi-bật)
-- [Cơ chế hoạt động](#-cơ-chế-hoạt-động)
-- [Cài đặt & Biên dịch](#-cài-đặt--biên-dịch)
-- [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
-  - [1. Làm sạch file đơn lẻ](#1-làm-sạch-file-đơn-lẻ)
-  - [2. Xóa watermark ngôi sao Gemini nổi](#2-xóa-watermark-ngôi-sao-gemini-nổi---erase-logo)
-  - [3. Chế độ Deep Clean (Phá SynthID)](#3-chế-độ-deep-clean-phá-watermark-ẩn-synthid---deep)
-  - [4. Xử lý hàng loạt thư mục đa luồng](#4-xử-lý-hàng-loạt-toàn-bộ-thư-mục-đa-luồng)
-  - [5. Kiểm tra trước không ghi file](#5-kiểm-tra-trước-không-ghi-file---dry-run)
-- [Bảng tham số CLI](#-bảng-tham-số-cli)
-- [Hiệu năng](#-hiệu-năng)
-- [Giấy phép](#-giấy-phép)
+Allows you to publish images to major social media platforms (**Facebook, Instagram, Threads, X/Twitter, TikTok, LinkedIn**) without being automatically detected and labeled as **"AI-generated / AI info"**.
 
 ---
 
-## 🧐 Tại sao cần công cụ này?
+## 📌 Table of Contents
 
-Khi bạn tạo hình ảnh bằng **Google Gemini, Midjourney, Stable Diffusion, ComfyUI, DALL-E 3 hoặc Adobe Firefly**, ảnh xuất ra thường bị nhúng các loại dấu vết sau:
+- [Why AI Image Cleaner?](#-why-ai-image-cleaner)
+- [Key Features](#-key-features)
+- [How It Works](#-how-it-works)
+- [Installation & Build](#-installation--build)
+- [Usage Guide](#-usage-guide)
+  - [1. Single File Cleaning (Standard Mode)](#1-single-file-cleaning-standard-mode)
+  - [2. Erasing Visible Gemini Corner Logos](#2-erasing-visible-gemini-corner-logos---erase-logo)
+  - [3. Deep Clean Mode (Disrupting SynthID)](#3-deep-clean-mode-disrupting-synthid---deep)
+  - [4. Multi-Threaded Batch Processing](#4-multi-threaded-batch-processing)
+  - [5. Dry-Run Inspection](#5-dry-run-inspection---dry-run)
+- [CLI Reference Table](#-cli-reference-table)
+- [Performance](#-performance)
+- [License](#-license)
+
+---
+
+## 🧐 Why AI Image Cleaner?
+
+When images are generated using tools such as **Google Gemini, Midjourney, Stable Diffusion, ComfyUI, DALL-E 3, or Adobe Firefly**, multiple layers of provenance and tracking data are embedded:
 
 1. **C2PA Manifests (Content Credentials):**
-   - Chuẩn xác thực kỹ thuật số do liên minh Adobe, Microsoft, Google, Meta lập ra.
-   - Lưu trữ dạng JUMBF box trong chunk `caBX` (với PNG) hoặc APP11 marker (với JPEG).
-   - **Meta (Facebook/Instagram) và TikTok quét trực tiếp manifest này để tự động gắn nhãn "AI info".**
-2. **Standard Metadata & Text Chunks:**
-   - Các chunk `tEXt`, `zTXt`, `iTXt` trong PNG lưu toàn bộ prompt bí mật, seed, model checkpoint và workflow (đặc biệt là ComfyUI / Automatic1111).
-   - Thẻ EXIF/XMP ghi rõ phần mềm sinh ảnh.
-3. **Watermark vô hình ở miền tần số (Google SynthID / Stable Signature):**
-   - Watermark ẩn trực tiếp vào phân bố pixel/tần số không gian, mắt thường không thấy nhưng máy tính quét được.
-4. **Watermark nổi (Visible Watermarks):**
-   - Biểu tượng ngôi sao lấp lánh 4 cánh của Google Gemini in nổi ở góc dưới bên phải.
+   - Cryptographic provenance standard developed by Adobe, Microsoft, Google, Meta, and OpenAI.
+   - Embedded as JUMBF boxes in the `caBX` chunk (PNG) or APP11 marker (JPEG).
+   - **Meta (Facebook/Instagram) and TikTok scan these manifests directly to apply automated "AI Info" labels.**
+2. **Standard Metadata & Prompt Text Chunks:**
+   - PNG text chunks (`tEXt`, `zTXt`, `iTXt`) storing full generation prompts, seeds, sampler settings, and workflow JSON (especially from ComfyUI / Automatic1111).
+   - EXIF/XMP tags identifying generator software.
+3. **Invisible Frequency-Domain Watermarking (Google SynthID / Stable Signature):**
+   - Watermarks embedded into spatial pixel distributions and discrete cosine transform (DCT) latents, imperceptible to the human eye but machine-detectable.
+4. **Visible Corner Logos:**
+   - Semi-transparent 4-pointed sparkle stars stamped in the corner (e.g., Google Gemini web app exports).
 
-`ai-image-cleaner` giải quyết triệt để cả 4 lớp trên bằng thuật toán xử lý ảnh thuần viết trên Rust.
-
----
-
-## ⚡ Tính năng nổi bật
-
-- 🧼 **Xóa sạch 100% C2PA & Metadata:** Tái đóng gói container ảnh sạch từ pixel thô, triệt tiêu 100% chunk `caBX`, `c2pa`, `eXIf`, `tEXt`, `zTXt`, `iTXt`, APP11, APP13.
-- ✨ **Xóa Logo Gemini nổi (`--erase-logo`):** Tự động phát hiện và inpaint/xóa bỏ biểu tượng ngôi sao 4 cánh của Gemini ở góc ảnh mà không cần cắt xén mất bố cục ảnh.
-- 🔬 **Chế độ Deep Clean (`--deep`):** Vi dịch chuyển biên (1–2px crop/resample) kết hợp vi nhiễu dither luân phiên để phá vỡ cấu trúc lưới DCT của watermark ẩn (SynthID).
-- 🚀 **Hiệu năng cực nhanh với Rayon:** Xử lý hàng nghìn bức ảnh đa luồng song song trên toàn bộ nhân CPU.
-- 🛡️ **An toàn dữ liệu:** Mặc định không bao giờ ghi đè file gốc (xuất vào `./cleaned/` hoặc thư mục chỉ định), chỉ ghi đè khi truyền cờ `--in-place`.
+`ai-image-cleaner` tackles all four layers using native Rust image-processing pipelines.
 
 ---
 
-## 🔬 Cơ chế hoạt động
+## ⚡ Key Features
+
+- 🧼 **100% C2PA & Metadata Eradication:** Decodes raw pixel buffers and repacks into clean containers, wiping all `caBX`, `c2pa`, `eXIf`, `tEXt`, `zTXt`, `iTXt`, APP11, and APP13 markers with **zero visual quality loss**.
+- ✨ **Visible Logo Eraser (`--erase-logo`):** Automatically detects and seamlessly inpaints the Google Gemini 4-pointed sparkle star in the corner without cropping out the image composition.
+- 🔬 **Deep Clean Mode (`--deep`):** Applies micro-perturbations (1–2px boundary crop/resample + alternating micro-dithering) to disrupt frequency-domain latent watermarks (SynthID).
+- 🚀 **Rayon Multi-Core Batching:** Scans and processes thousands of images in parallel across all CPU cores.
+- 🛡️ **Data Safety:** Never overwrites source files by default (saves to `./cleaned/` or a custom `--output` path); in-place overwrite requires an explicit `--in-place` flag.
+
+---
+
+## 🔬 How It Works
 
 ```
-[ Ảnh AI Đầu Vào ]
+[ Input AI Image ]
        │
-       ├───> 1. Kiểm tra & Bóc tách Metadata (EXIF, XMP, C2PA caBX, Prompt Chunks)
+       ├───> 1. Inspect & Strip Metadata (EXIF, XMP, C2PA caBX, Prompt Chunks)
        │
-       ├───> 2. [Tùy chọn: --erase-logo] Inpaint xóa logo nổi ở góc (Gemini Star)
+       ├───> 2. [Optional: --erase-logo] Inpaint visible corner watermarks (Gemini Star)
        │
-       ├───> 3. [Tùy chọn: --deep] Micro-dithering & DCT Resample phá watermark ẩn SynthID
+       ├───> 3. [Optional: --deep] Micro-dithering & DCT Resample to neutralize SynthID
        │
-       └───> 4. Đóng gói Container Mới (Clean PNG / JPEG 95% / WebP Lossless)
-                 └──> [ Ảnh Đầu Ra Sạch 100% - MXH không gắn nhãn ]
+       └───> 4. Repack into Clean Container (Clean PNG / 95% High-Q JPEG / Lossless WebP)
+                 └──> [ 100% Clean Image — No Social Media AI Detection ]
 ```
 
 ---
 
-## 🛠️ Cài đặt & Biên dịch
+## 🛠️ Installation & Build
 
-Yêu cầu máy đã cài đặt [Rust & Cargo](https://rustup.rs/) (phiên bản 1.80+):
+Requires [Rust & Cargo](https://rustup.rs/) (version 1.80+):
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/pmkhang/ai-image-cleaner.git
 cd ai-image-cleaner
 
-# Biên dịch bản phát hành tối ưu
+# Compile optimized release binary
 cargo build --release
 
-# Binary sẽ nằm tại: target/release/ai-image-cleaner
+# The compiled binary is located at: target/release/ai-image-cleaner
 ```
 
-*(Tùy chọn) Thêm vào PATH hệ thống để gọi lệnh ở bất kỳ đâu:*
+*(Optional) Install globally to PATH:*
 ```bash
 cp target/release/ai-image-cleaner ~/.local/bin/
 ```
 
 ---
 
-## 📖 Hướng dẫn sử dụng
+## 📖 Usage Guide
 
-### 1. Làm sạch file đơn lẻ (Standard Clean)
-Xóa toàn bộ C2PA, EXIF, prompt metadata mà giữ nguyên 100% chất lượng pixel:
+### 1. Single File Cleaning (Standard Mode)
+Removes all C2PA, EXIF, and generation prompt metadata while preserving 100% pixel fidelity:
 
 ```bash
-# Xuất file sạch vào thư mục ./cleaned/
+# Outputs clean image to ./cleaned/my_image.png
 ai-image-cleaner my_image.png
 
-# Chỉ định đường dẫn xuất cụ thể
+# Specify custom output path
 ai-image-cleaner my_image.png -o clean.png
 
-# Ghi đè trực tiếp lên file gốc
+# Overwrite in-place
 ai-image-cleaner my_image.png --in-place
 ```
 
-### 2. Xóa watermark ngôi sao Gemini nổi (`--erase-logo`)
-Nếu ảnh tạo từ Google Gemini có biểu tượng ngôi sao ở góc dưới phải:
+### 2. Erasing Visible Gemini Corner Logos (`--erase-logo`)
+If an image from Google Gemini has the visual sparkle star watermark in the bottom-right corner:
 
 ```bash
 ai-image-cleaner gemini_photo.png --erase-logo -o clean.png
 ```
 
-### 3. Chế độ Deep Clean (Phá watermark ẩn SynthID) (`--deep`)
-Phá watermark ẩn tần số cao kết hợp gỡ metadata:
+### 3. Deep Clean Mode (Disrupting SynthID) (`--deep`)
+Neutralizes invisible frequency-domain watermarks in addition to stripping metadata:
 
 ```bash
 ai-image-cleaner gemini_photo.png --deep --strength medium -o clean.png
 ```
 
-*Có thể kết hợp cả xóa logo lẫn phá watermark ẩn:*
+*Combine both logo erasure and deep invisible watermark disruption:*
 ```bash
 ai-image-cleaner gemini_photo.png --erase-logo --deep -o clean.png
 ```
 
-### 4. Xử lý hàng loạt toàn bộ thư mục đa luồng
-Tận dụng tối đa mọi nhân CPU để quét sạch toàn bộ thư mục ảnh:
+### 4. Multi-Threaded Batch Processing
+Utilize all CPU cores to clean entire photo folders:
 
 ```bash
-# Xử lý tất cả ảnh trong thư mục và lưu vào ./output_folder/
+# Process all images in directory and save to ./output_folder/
 ai-image-cleaner ./ai_gallery/ -o ./output_folder/
 
-# Quét đệ quy tất cả thư mục con
+# Recursively scan subdirectories
 ai-image-cleaner ./ai_gallery/ --recursive -o ./output_folder/
 
-# Giới hạn số luồng CPU (ví dụ: 4 luồng)
+# Limit worker threads (e.g., 4 threads)
 ai-image-cleaner ./ai_gallery/ --threads 4 -o ./output_folder/
 ```
 
-### 5. Kiểm tra trước không ghi file (`--dry-run`)
-Kiểm tra xem ảnh có chứa metadata AI, C2PA hay prompt ẩn không mà không thay đổi bất kỳ file nào:
+### 5. Dry-Run Inspection (`--dry-run`)
+Inspect images for embedded AI metadata, C2PA manifests, and prompt tags without writing any files:
 
 ```bash
 ai-image-cleaner ./ai_gallery/ --dry-run -v
@@ -156,34 +158,34 @@ ai-image-cleaner ./ai_gallery/ --dry-run -v
 
 ---
 
-## 📋 Bảng tham số CLI
+## 📋 CLI Reference Table
 
-| Tham số | Dạng rút gọn | Mặc định | Mô tả |
+| Option | Short | Default | Description |
 | :--- | :---: | :---: | :--- |
-| `<INPUT>` | - | *(Bắt buộc)* | Đường dẫn file ảnh hoặc thư mục cần xử lý |
-| `--output <PATH>` | `-o` | `./cleaned/` | Đường dẫn file hoặc thư mục đầu ra |
-| `--in-place` | `-i` | `false` | Ghi đè trực tiếp lên file nguồn (không dùng chung với `-o`) |
-| `--erase-logo` | - | `false` | Tự động phát hiện và xóa watermark/logo nổi của Gemini ở góc ảnh |
-| `--deep` | `-d` | `false` | Bật chế độ phá watermark ẩn tần số cao (SynthID) |
-| `--strength <LVL>` | - | `medium` | Mức độ can thiệp pixel: `low`, `medium`, `high` |
-| `--recursive` | `-r` | `false` | Quét đệ quy mọi thư mục con khi đầu vào là thư mục |
-| `--threads <N>` | `-t` | Số nhân CPU | Số luồng xử lý song song (Rayon worker threads) |
-| `--dry-run` | - | `false` | Chỉ kiểm tra và báo cáo metadata, không ghi file |
-| `--verbose` | `-v` | `false` | In thông tin chi tiết từng chunk và thẻ metadata được gỡ |
-| `--help` | `-h` | - | Hiển thị trợ giúp chi tiết |
+| `<INPUT>` | - | *(Required)* | Path to source image file or directory |
+| `--output <PATH>` | `-o` | `./cleaned/` | Output file path or destination directory |
+| `--in-place` | `-i` | `false` | Overwrite source file(s) in-place (mutually exclusive with `-o`) |
+| `--erase-logo` | - | `false` | Detect and seamlessly inpaint visible corner watermarks (Gemini star) |
+| `--deep` | `-d` | `false` | Enable micro-perturbation mode to disrupt SynthID watermarks |
+| `--strength <LVL>` | - | `medium` | Perturbation intensity: `low`, `medium`, `high` |
+| `--recursive` | `-r` | `false` | Recursively scan subdirectories when input is a directory |
+| `--threads <N>` | `-t` | CPU Cores | Number of worker threads (Rayon thread pool) |
+| `--dry-run` | - | `false` | Inspect and report detected metadata without modifying files |
+| `--verbose` | `-v` | `false` | Print detailed logs for each stripped chunk and tag |
+| `--help` | `-h` | - | Show full command-line help |
 
 ---
 
-## 📊 Hiệu năng
+## 📊 Performance
 
-Được tối ưu hóa bằng Rust và Rayon, công cụ đạt tốc độ xử lý vượt trội:
-- **Ảnh PNG 2MB:** ~0.05 giây / ảnh
-- **Ảnh 4K PNG 8MB:** ~0.65 giây / ảnh (ngay cả khi bật chế độ Deep Mode)
-- **Batch 1,000 ảnh:** Xử lý song song hoàn tất trong vài giây trên CPU đa nhân hiện đại.
+Engineered in Rust with zero unnecessary memory copies and multi-core Rayon parallelism:
+- **2MB PNG Image:** ~0.05 seconds / image
+- **4K 8MB PNG Image:** ~0.65 seconds / image (even with Deep Mode active)
+- **Batch of 1,000 images:** Parallelized across all logical CPU cores in seconds.
 
 ---
 
-## 📄 Giấy phép
+## 📄 License
 
-Phát hành theo giấy phép [MIT License](LICENSE).
-Tự do sử dụng, chỉnh sửa và tích hợp vào các dự án cá nhân hoặc thương mại.
+Distributed under the [MIT License](LICENSE).
+Free to use, modify, and distribute for personal and commercial projects.
